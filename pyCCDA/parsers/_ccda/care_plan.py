@@ -6,12 +6,9 @@ Created on Mon Jul  2 16:13:02 2018
 @author: mansooralam, yanjingwang
 """
 
-
-
-from bluebutton import core
-from bluebutton.core import codes
-from bluebutton import documents
+from ... import core
 from ...core import wrappers
+
 
 def care_plan(ccda):
 

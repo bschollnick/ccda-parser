@@ -18,7 +18,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
 def parse(data):
-    if not data or not isinstance(data, basestring):
+    if not data or not isinstance(data, str):
         logging.info('BB Error: XML data is not a string')
         return None
 
@@ -130,7 +130,8 @@ class _Element(object):
             if not hasattr(el, 'parent'):
                 # TODO: replace with lxml .parent so we don't have to traverse a sub-tree *every* time we call this function
                 parent_map = {c: p for p in self._element.iter() for c in p}
-                el.parent = parent_map[el]
+                return self._wrap_element(parent_map[el])
+                # el.parent = parent_map[el]
             return self._wrap_element(el.parent)
 
     def val(self):

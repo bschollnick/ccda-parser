@@ -8,8 +8,7 @@ Created on Mon Jul  2 21:56:30 2018
 
 from . import core
 from . import documents
-import documents.ccda
-import parsers.ccda
+from . import parsers
 
 
 class CCDA(object):
