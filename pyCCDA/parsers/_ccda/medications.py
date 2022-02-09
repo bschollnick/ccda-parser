@@ -18,8 +18,9 @@ from ... import documents
 def medications(ccda):
 
     parse_date = documents.parse_date
+    parse_address = documents.parse_address
+    parse_name = documents.parse_name
     data = wrappers.ListWrapper()
-
     medications = ccda.section('medications')
 
     for entry in medications.entries():
@@ -28,7 +29,7 @@ def medications(ccda):
         sig = core.strip_whitespace(el.val())
 
         effective_times = entry.els_by_tag('effectiveTime')
-
+        status = entry.tag("statusCode").attr("code")
         # the first effectiveTime is the med start date
         try:
             el = effective_times[0]
@@ -62,7 +63,7 @@ def medications(ccda):
             schedule_period_unit = el.attr('unit')
 
         el = entry.tag('manufacturedProduct').tag('code')
-        product_name = el.attr('displayName')
+        product_name = el.attr('displayName').strip()
         product_code = el.attr('code')
         product_code_system = el.attr('codeSystem')
 
@@ -74,11 +75,34 @@ def medications(ccda):
         if not product_name and product_original_text:
             product_name = product_original_text
 
-        el = entry.tag('manufacturedProduct').tag('translation')
-        translation_name = el.attr('displayName')
-        translation_code = el.attr('code')
-        translation_code_system = el.attr('codeSystem')
-        translation_code_system_name = el.attr('codeSystemName')
+        el = entry.tag('manufacturedProduct').els_by_tag('translation')
+        manu_data = {}
+        for item in el:
+            csname = item.attr("codeSystemName").title()
+            manu_data[csname] = {}
+            manu_data[csname]["Name"] = item.attr("displayName")
+            manu_data[csname]["code"] = item.attr("code")
+            manu_data[csname]["codeSystem"] = item.attr("codeSystem")
+            manu_data[csname]["codeSystemName"] = item.attr("codeSystemName")
+
+        if "National Drug Codes" in manu_data:
+            translation_name = manu_data["National Drug Codes"]["Name"]
+            translation_code = manu_data["National Drug Codes"]["code"]
+            translation_code_system = manu_data["National Drug Codes"]["codeSystem"]
+            translation_code_system_name = manu_data["National Drug Codes"]["codeSystemName"]
+        else:
+            translation_name = manu_Data[manu_data.keys()[0]]["Name"]
+            translation_code = manu_data[manu_data.keys()[0]]["code"]
+            translation_code_system = manu_data[manu_data.keys()[0]]["codeSystem"]
+            translation_code_system_name = manu_data[manu_data.keys()[0]]["codeSystemName"]
+
+            #el = entry.tag('manufacturedProduct').tag('translation')
+            #translation_name = el.attr('displayName')
+            #if translation_name not in ["", None]:
+                #translation_name = translation_name.strip()
+            #translation_code = el.attr('code')
+            #translation_code_system = el.attr('codeSystem')
+            #translation_code_system_name = el.attr('codeSystemName')
 
         el = entry.tag('doseQuantity')
         dose_value = el.attr('value')
@@ -122,7 +146,11 @@ def medications(ccda):
         administration_code_system_name = el.attr('codeSystemName')
 
         # performer => prescriber
-        el = entry.tag('performer')
+        #el = entry.tag('performer')
+        author = entry.tag("author")
+        provider_name = parse_name(author.tag("assignedAuthor").tag("assignedPerson").tag("name"))
+#        provider_phone = author.tag("assignedAuthor").tag("telecom")
+#        provider_addr = parse_address(author.tag("assignedAuthor").tag("addr"))
         prescriber_organization = el.tag('name').val()
         prescriber_person = None
 
@@ -132,6 +160,7 @@ def medications(ccda):
                 end=end_date
             ),
             text=sig,
+            status=status,
             product=wrappers.ObjectWrapper(
                 name=product_name,
                 code=product_code,
@@ -187,7 +216,8 @@ def medications(ccda):
             ),
             prescriber=wrappers.ObjectWrapper(
                 organization=prescriber_organization,
-                person=prescriber_person
+                person=prescriber_person,
+                provider=provider_name,
             )
         ))
 

@@ -68,6 +68,8 @@ def allergies(ccda):
             if not el.is_empty():
                 allergen_name = core.strip_whitespace(el.val())
 
+        if severity in ["", None]:
+            severity = entry.tag("entryRelationship").tag("entryRelationship").tag("observation").tag("value").attr("displayName")
         # status
         el = entry.template('2.16.840.1.113883.10.20.22.4.28').tag('value')
         status = el.attr('displayName')

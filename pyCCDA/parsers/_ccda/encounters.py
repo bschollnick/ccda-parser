@@ -11,13 +11,13 @@ Parser for the CCDA encounters section
 """
 
 from ...core import wrappers
-from ...documents import parse_address, parse_date
+from ...documents import parse_address, parse_date, parse_name
 
 
 def encounters(ccda):
 
     data = []
-    
+
     encounters = ccda.section('encounters')
 
     for entry in encounters.entries():
@@ -30,28 +30,42 @@ def encounters(ccda):
         code_system = el.attr('codeSystem')
         code_system_name = el.attr('codeSystemName')
         code_system_version = el.attr('codeSystemVersion')
-        
+
         # translation
         el = entry.tag('translation')
         translation_name = el.attr('displayName')
         translation_code = el.attr('code')
         translation_code_system = el.attr('codeSystem')
         translation_code_system_name = el.attr('codeSystemName')
-        
+
         # performer
-        el = entry.tag('performer').tag('code')
-        performer_name = el.attr('displayName')
-        performer_code = el.attr('code')
-        performer_code_system = el.attr('codeSystem')
-        performer_code_system_name = el.attr('codeSystemName')
-      
+        el = entry.tag("performer").tag("assignedEntity")
+        performer_name = parse_name(el.tag("assignedPerson").tag("name"))
+        performer_suffix = el.tag("assignedPerson").tag("name").tag("suffix").val()
+
+        el = el.tag("representedOrganization")
+        performer_org = el.tag("name").val()
+        performer_addr = parse_address(el.tag("addr"))
+        phones = el.els_by_tag("telecom")
+        performer_phone = []
+        for pnumber in phones:
+            performer_phone.append(pnumber.attr("value"))
+        #performer_phone = el.tag("telecom").attr("value")
+
+
+        #el = entry.tag('performer').tag('code')
+        #performer_name = el.attr('displayName')
+        #performer_code = el.attr('code')
+        #performer_code_system = el.attr('codeSystem')
+        #performer_code_system_name = el.attr('codeSystemName')
+
         # participant => location
         el = entry.tag('participant')
         organization = el.tag('code').attr('displayName')
-        
+
         location_dict = parse_address(el)
         location_dict.organization = organization
-    
+
         # findings
         findings = []
         findings_els = entry.els_by_tag('entryRelationship')
@@ -79,9 +93,13 @@ def encounters(ccda):
             ),
             performer=wrappers.ObjectWrapper(
                 name=performer_name,
-                code=performer_code,
-                code_system=performer_code_system,
-                code_system_name=performer_code_system_name
+                suffix=performer_suffix,
+                org=performer_org,
+                address=performer_addr,
+                phone=performer_phone
+                #code=performer_code,
+                #code_system=performer_code_system,
+                #code_system_name=performer_code_system_name
             ),
             location=location_dict
         ))

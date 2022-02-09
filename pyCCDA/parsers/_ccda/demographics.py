@@ -9,7 +9,8 @@ Created on Mon Jul  2 16:48:03 2018
 from ...core import codes
 from ... import documents
 from ...core import wrappers
-
+import langcodes
+from pprint import pprint
 
 def demographics(ccda):
     parse_date = documents.parse_date
@@ -37,7 +38,9 @@ def demographics(ccda):
 
     email = None
 
-    language = patient.tag('languageCommunication').tag('languageCode').attr('code')
+    languageCode = patient.tag('languageCommunication').tag('languageCode').attr('code')
+    language = langcodes.Language.make(languageCode).display_name()
+
     race = patient.tag('raceCode').attr('displayName')
     ethnicity = patient.tag('ethnicGroupCode').attr('displayName')
     religion = patient.tag('religiousAffiliationCode').attr('displayName')
@@ -50,17 +53,39 @@ def demographics(ccda):
     guardian_relationship_code = el.tag('code').attr('code')
     guardian_home = el.tag('telecom').attr('value')
 
+
     el = el.tag('guardianPerson').tag('name')
     guardian_name_dict = parse_name(el)
 
     el = patient.tag('guardian').tag('addr')
     guardian_address_dict = parse_address(el)
 
+    participant = demographics.tag("participant")
+    assoc_entity = participant.tag("associatedEntity")
+    associated_name_dict = parse_name(assoc_entity.tag("associatedPerson").tag("name"))
+
+    el = assoc_entity.tag('addr')
+    associated_address_dict = parse_address(el)
+
+    associated_phone = assoc_entity.tag('telecom').attr("value")
+    associated_relation = assoc_entity.tag("code").attr("displayName")
+
     el = patient.tag('providerOrganization')
     provider_organization = el.tag('name').val()
     provider_phone = el.tag('telecom').attr('value')
 
     provider_address_dict = parse_address(el.tag('addr'))
+
+    pcp = demographics.tag("documentationOf").tag("serviceEvent")
+    pcp_start_date = parse_date(pcp.tag("effectiveTime").tag('low').attr('value'))
+    pcp_end_date = parse_date(pcp.tag("effectiveTime").tag('high').attr('value'))
+    pcp = pcp.tag("performer")
+    pname = pcp.tag("assignedEntity").tag("assignedPerson").tag("name")
+    pcp_name = parse_name(pname)
+    pcp_suffix = pname.tag("suffix").val()
+    pcp_label = pcp.tag("functionCode").attr("displayName")
+    pcp_addr = parse_address(pcp.tag("assignedEntity").tag("addr"))
+    pcp_phone = pcp.tag("assignedEntity").tag('telecom').attr("value")
 
     return wrappers.ObjectWrapper(
         name=patient_name_dict,
@@ -74,6 +99,7 @@ def demographics(ccda):
             mobile=mobile
         ),
         email=email,
+        languageCode=languageCode,
         language=language,
         race=race,
         ethnicity=ethnicity,
@@ -82,6 +108,18 @@ def demographics(ccda):
             state=birthplace_dict.state,
             zip=birthplace_dict.zip,
             country=birthplace_dict.country
+        ),
+        associated=wrappers.ObjectWrapper(
+            name=wrappers.ObjectWrapper(
+                given=associated_name_dict.given,
+                family=associated_name_dict.family
+            ),
+            relationship=associated_relation,
+            relationship_code="",
+            address=associated_address_dict,
+            phone=wrappers.ObjectWrapper(
+                home=associated_phone
+            )
         ),
         guardian=wrappers.ObjectWrapper(
             name=wrappers.ObjectWrapper(
@@ -95,6 +133,14 @@ def demographics(ccda):
                 home=guardian_home
             )
         ),
+        pcp=wrappers.ObjectWrapper(
+            name=pcp_name,
+            suffix=pcp_suffix,
+            phone=pcp_phone,
+            address=pcp_addr,
+            label=pcp_label,
+            ),
+
         provider=wrappers.ObjectWrapper(
             organization=provider_organization,
             phone=provider_phone,

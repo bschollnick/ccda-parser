@@ -30,7 +30,6 @@ def vitals(ccda):
         results_data = wrappers.ListWrapper()
 
         for result in results:
-
             el = result.tag('code')
             name = el.attr('displayName')
             code = el.attr('code')
@@ -47,7 +46,9 @@ def vitals(ccda):
                 code_system=code_system,
                 code_system_name=code_system_name,
                 value=value,
-                unit=unit
+                unit=unit,
+                date=result.tag('effectiveTime').attr("value").strip()
+
             ))
 
         data.append(wrappers.ObjectWrapper(

@@ -17,6 +17,8 @@ from ... import documents
 def results(ccda):
 
     parse_date = documents.parse_date
+    parse_address = documents.parse_address
+    parse_name = documents.parse_name
     data = wrappers.ListWrapper()
 
     results = ccda.section('results')
@@ -64,6 +66,8 @@ def results(ccda):
             if not value:
                 value = el.val() # look for free-text values
 
+            status = observation.tag("statusCode").attr("code")
+            provider = parse_name(observation.tag("author").tag("assignedAuthor").tag("assignedPerson"))
             el = observation.tag('referenceRange')
             reference_range_text = core.strip_whitespace(el.tag('observationRange').tag('text').val())
             reference_range_low_unit = el.tag('observationRange').tag('low').attr('unit')
@@ -72,6 +76,7 @@ def results(ccda):
             reference_range_high_value = el.tag('observationRange').tag('high').attr('value')
 
             tests_data.append(wrappers.ObjectWrapper(
+                status = status,
                 date=date,
                 name=name,
                 value=value,
@@ -79,6 +84,7 @@ def results(ccda):
                 code=code,
                 code_system=code_system,
                 code_system_name=code_system_name,
+                provider=provider,
                 translation=wrappers.ObjectWrapper(
                     name=translation_name,
                     code=translation_code,
