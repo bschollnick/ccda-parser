@@ -528,13 +528,13 @@ for fname in filenames:
 #    pprint(document.return_documents())        # CCD Title
 #   pprint(document.return_encounters()[0:5])
 #    pprint(document.return_functional_statuses())
-    #pprint(document.return_immunizations()) # untested
-    #print(document.return_instructions()) # untested
+    #pprint(document.return_immunizations())
+    #print(document.return_instructions()) 
 #    pprint(document.return_medications()[0:5])
 #    pprint(document.return_problems())
     pprint(document.return_procedures()[0:3])
     #pprint(document.return_allergies())
-    #print (document.return_careplan()) # Patricia Bunk only
+    #print (document.return_careplan()) 
  #   pprint(document.return_results()[0:5])  #???
     #pprint(document.return_smoking())
     #pprint(document.return_vitals())
