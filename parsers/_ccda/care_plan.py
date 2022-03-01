@@ -36,6 +36,8 @@ def care_plan(ccda):
             code_system_name = el.attr('codeSystemName')
 
         text = core.strip_whitespace(entry.tag('text').val())
+        if text in ["", None]:
+            text = core.strip_whitespace(entry.tag('originalText').val())
 
         data.append(
             wrappers.ObjectWrapper(

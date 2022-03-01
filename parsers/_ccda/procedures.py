@@ -59,12 +59,25 @@ def procedures(ccda):
         specimen_code = None
         specimen_code_system = None
 
-        el = entry.tag('performer').tag('addr')
+        #el = entry.tag('performer').tag('addr')
+        addresses = entry.els_by_tag("addr")
+        ##for ex in el:
+         #   print(dir(ex), ex.empty(), ex.is_empty(), ex)
+         #   if el is None:
+         #       print("None")
+         #       print(entry.tag("procedure").attr("classCode"))
+
+#        sys.exit()
+#        if el is None:
+#            el = entry.tag("performer").tag("assignedEntity").tag("addr")
         organization = entry.tag("representedOrganization").tag('name').val()
         phone = entry.tag("representedOrganization").tag('telecom').attr('value')
 
-
-        performer_dict = parse_address(entry.tag("representedOrganization").tag("addr"))
+        for addr in addresses:
+            performer_dict = parse_address(addr)
+            print(dir(performer_dict))
+            print(performer_dict.street)
+        #performer_dict = parse_address(entry.tag("representedOrganization").tag("addr"))
         performer_dict.organization = organization
         performer_dict.phone = phone
         performer_dict.name =  parse_name(entry.tag("name"))

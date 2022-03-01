@@ -12,17 +12,28 @@ Parser for the CCDA encounters section
 
 from ...core import wrappers
 from ...documents import parse_address, parse_date, parse_name
+from ... import documents
 
 
 def encounters(ccda):
+
+    parse_phones = documents.parse_phones_and_email
 
     data = []
 
     encounters = ccda.section('encounters')
 
     for entry in encounters.entries():
-
-        date = parse_date(entry.tag('effectiveTime').attr('value'))
+        start_date = parse_date(entry.tag('effectiveTime').attr('value'))
+        end_date = start_date
+        if start_date is None:
+#           Allscripts - PRofession EHR\datapoint_ambulatory sample XML does not contain all encounter data
+            start_date = parse_date(entry.tag("effectiveTime").tag("low").attr("value"))
+            end_date = parse_date(entry.tag("effectiveTime").tag("high").attr("value"))
+            if end_date is None:
+                end_date = entry.tag("effectiveTime").tag("high").attr("nullFlavor")
+                
+#            sys.exit()
 
         el = entry.tag('code')
         name = el.attr('displayName')
@@ -46,10 +57,12 @@ def encounters(ccda):
         el = el.tag("representedOrganization")
         performer_org = el.tag("name").val()
         performer_addr = parse_address(el.tag("addr"))
-        phones = el.els_by_tag("telecom")
-        performer_phone = []
-        for pnumber in phones:
-            performer_phone.append(pnumber.attr("value"))
+        performer_phone = parse_phones(el.els_by_tag("telecom"))
+        
+        
+        #performer_phone = []
+        #for pnumber in phones:
+        #    performer_phone.append(pnumber.attr("value"))
         #performer_phone = el.tag("telecom").attr("value")
 
 
@@ -70,15 +83,27 @@ def encounters(ccda):
         findings = []
         findings_els = entry.els_by_tag('entryRelationship')
         for current in findings_els:
-            el = current.tag('value')
-            findings.append(wrappers.ObjectWrapper(
-                name=el.attr('displayName'),
-                code=el.attr('code'),
-                code_system=el.attr('codeSystem'),
-            ))
+            erel = current.tag("act").tag("entryRelationship")
+            if erel.tag("statusCode").attr("code") not in ["", None, "None"]:
+                findings.append ({"Status":erel.tag("statusCode").attr("code"),
+                                  "Action":erel.tag("code").attr("displayName"),
+                                  "Diagnosis":erel.tag("value").tag("translation").attr("displayName"),
+                                  "Dx":erel.tag("value").tag("translation").attr("code"),
+                                  "CodeSystemName":erel.tag("value").tag("translation").attr("codeSystemName"),
+                                 })
+        # findings = []
+        # findings_els = entry.els_by_tag('entryRelationship')
+        # for current in findings_els:
+            # el = current.tag('value')
+            # findings.append(wrappers.ObjectWrapper(
+                # name=el.attr('displayName'),
+                # code=el.attr('code'),
+                # code_system=el.attr('codeSystem'),
+            # ))
 
         data.append(wrappers.ObjectWrapper(
-            date=date,
+            start_date=start_date,
+            end_date=end_date,
             name=name,
             code=code,
             code_system=code_system,
@@ -97,9 +122,6 @@ def encounters(ccda):
                 org=performer_org,
                 address=performer_addr,
                 phone=performer_phone
-                #code=performer_code,
-                #code_system=performer_code_system,
-                #code_system_name=performer_code_system_name
             ),
             location=location_dict
         ))

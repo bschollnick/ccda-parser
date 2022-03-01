@@ -2,31 +2,16 @@ import xmltodict
 import os.path
 from pprint import pprint
 import sys
+from nameparser import HumanName
+from datetime import datetime
+
 try:
     from pyccda import CCDA
 except ModuleNotFoundError:
     # #
-    # #   Kludge, since we don't want to publish standards on pypi
-    # #   This assumes that you have mirrored the arctools stash tree.
-    # #   This will allow standards to be imported from the arctools
-    # #   tree, and you won't need to duplicate it in hannon directory.
-    # #
     sys.path.append("..")
     from pyccda import CCDA
 
-# for fname in filenames:
-    # test_file = os.path.join(test_path, fname)
-    # with open(test_file, "r") as xml_file:
-        # raw_xml = " ".join(xml_file.readlines())
-        # xml_data = xmltodict.parse(raw_xml)
-        # print(xml_data["ClinicalDocument"]["title"])
-
-        # # patient_role data
-        # patient_role = xml_data["ClinicalDocument"]["recordTarget"]["patientRole"]
-        # print(patient_role["patient"]["name"]["given"], patient_role["patient"]["name"]["family"])
-
-        # print(xml_data["ClinicalDocument"]["documentationOf"]["serviceEvent"]["performer"]["functionCode"])
-        # #
 
 def build_address(address_data, start_data=None):
     if start_data:
@@ -46,32 +31,57 @@ def build_address(address_data, start_data=None):
         out_addr["Zip"] = address_data.zip
     return out_addr
 
+def is_empty(data):
+    return data in ["", None, "None", []]
+
+    
 def build_name(name_data):
     if type(name_data) is str:
         return name_data
     elif name_data in [None]:
         return ""
 
-    return {"Family":name_data.family,
-            "Given":name_data.given}
+    name = ""
+    if hasattr(name_data, "prefix"):
+        if not is_empty(name_data.prefix):
+            name += "%s " % name_data.prefix
+
+    if not is_empty(name_data.given):
+        name += " ".join(name_data.given)
+        
+    if not is_empty(name_data.family):
+        name += " %s" % name_data.family
+    
+    if hasattr(name_data, "suffix"):
+        if not is_empty(name_data.suffix):
+            name += " %s" % name_data.suffix
+
+    if is_empty(name):
+        return None
+
+    return HumanName(name)
 
 def build_phone(phone_data):
-#    print(type(phone_data), dir(phone_data))
+    out_phone = []
+    if phone_data in ["", None, {}]:
+        return None
+        
     if type(phone_data) is str:
+        #print("Phone String")
         return phone_data.strip()
     elif type(phone_data) is list:
-        return phone_data
-    out_phone = {}
-    if hasattr(phone_data, "home"):
-        out_phone["Home"] = phone_data.home
-    if hasattr(phone_data, "work"):
-        out_phone["Work"] = phone_data.work
-    if hasattr(phone_data, "mobile"):
-        out_phone["Mobile"] = phone_data.mobile
+        #print("Phone List")
+        for entry in phone_data:
+            out_phone.append(classify(entry, out_phone))
+        return out_phone
+    
+    outphone = []
+    for ptype in phone_data:
+        out_phone.append ({ptype.title():phone_data[ptype]})
+        
     return out_phone
 
 def build_author(author_data):
-    #print(dir(author_data.phone))
     output = {}
     if hasattr(author_data, "name"):
         output["Name"] = build_name(author_data.name)
@@ -171,29 +181,52 @@ class ccda_document():
         return output
 
     def return_demographics(self):
+        def return_provider(datum):
+            return {    "Start_Date":datum["start_date"],
+                        "End_Date":datum["end_date"],
+                        "Name":build_name(datum["name"]),
+                        "Address":build_address(datum["address"]),
+                        #"Organization":data.organization,
+                        "Phone":build_phone(datum["phone"]),
+                        "Email":datum["email"],
+                        "Label":datum["label"],
+                        #"Start_Date":
+                        }
+            
         data = self.ccda.data.demographics
         pcp = {"Name":build_name(data.pcp.name),
-               "Suffix":data.pcp.suffix,
+               #"Suffix":data.pcp.suffix,
                "Address":build_address(data.pcp.address),
                "Phone":build_phone(data.pcp.phone),
-               "Label":data.pcp.label}
+               "Label":data.pcp.label,
+               "Start":data.pcp.start_date,
+               "End":data.pcp.end_date,
+               "Email":data.pcp.email}
         associated = {"Address":build_address(data.associated.address),
                       "Name":build_name(data.associated.name),
                       "Phone":build_phone(data.associated.phone),
+                      "Email":data.associated.email,
                       "Relationship":data.associated.relationship,
                       "Relationship_Code":data.associated.relationship_code}
 
         guardian = {"Address":build_address(data.guardian.address),
                     "Name":build_name(data.guardian.name),
                     "Phone":build_phone(data.guardian.phone),
+                    "Email":data.guardian.email,
                     "Relationship":data.guardian.relationship,
                     "Relationship_Code":data.guardian.relationship_code}
+        lauth = {"Address":build_address(data.legal_authenticator["address"]),
+                 "Name":build_name(data.legal_authenticator["name"]),
+                 "Phone":build_phone(data.legal_authenticator["phone"]),
+                 "Email":data.legal_authenticator["email"],
+                 "Time":data.legal_authenticator["time"]}
 
-        provider = {"Address":build_address(data.provider.address),
-                    "Organization":data.provider.organization,
-                    "Phone":build_phone(data.provider.phone)}
-
-        return {"Address":build_address(data.address),
+        providers = []
+        for prov in data.providers:
+            providers.append(return_provider(prov))
+            
+        return {"Mrns":data.mrns,
+                "Address":build_address(data.address),
                 "Birthplace":build_address(data.birthplace),#data.birthplace,
                 "Dob":data.dob,
                 "Email":data.email,
@@ -206,29 +239,31 @@ class ccda_document():
                 "Marital_Status":data.marital_status,
                 "Name":build_name(data.name),
                 "Phone":build_phone(data.phone),
-                "Provider":provider,
+                "Providers":providers,
                 "Pcp":pcp,
                 "Race":data.race,
-                "Religion":data.religion
+                "Religion":data.religion,
+                "Legal_Authenticator":lauth,
                 }
 
     def return_encounters(self):
         def return_encounter_element(datum):
-            findings = []
-            for entry in findings:
-                findings.append(entry)
+            #findings = []
+            #for entry in findings:
+            #    findings.append(entry)
             return {"Code":datum.code,
                     "Code_System":datum.code_system,
                     "Code_System_Name":datum.code_system_name,
-                    "Date":datum.date,
-                    "Findings":findings,
+                    "Start Date":datum.start_date,
+                    "End Date":datum.end_date,
+                    "Findings":datum.findings,
                     "Location":build_location(datum.location),
                     "Name":datum.name,
                     "Performer":{"Name":build_name(datum.performer.name),
                                  "Suffix":datum.performer.suffix,
                                  "Organization":datum.performer.org,
                                  "Address":build_address(datum.performer.address),
-                                 "Phone":build_phone(datum.performer.phone),
+                                 "Phone":datum.performer.phone,
                                  },
                     "Translation":datum.translation.name,
                     "Translation Code":datum.translation.code
@@ -252,23 +287,61 @@ class ccda_document():
 
     def return_immunizations(self):
         """
-        untested
         """
+        def build_route(datum):
+            return {"Code":datum.code,
+                    "Code_System":datum.code_system,
+                    "Code_System_Name":datum.code_system_name,
+                    "Name":build_name(datum.name)}
+            
+        def build_translation(trans):
+            return {"Code":trans.code,
+                    "Code_System":trans.code_system,
+                    "Code_System_Name":trans.code_system_name,
+                    "Name":build_name(trans.name)}
+                    
+        def build_product(datum):
+            return {"Code":datum.code,
+                    "Code_System":datum.code_system,
+                    "Code_System_Name":datum.code_system_name,
+                    "Lot_Number":datum.lot_number,
+                    "Manufacturer_Name":datum.manufacturer_name,
+                    "Name":build_name(datum.name),
+                    "Translation":build_translation(datum.translation)}
+            
+        def build_education(datum):
+
+            return {"Code":datum.code,
+                    "Code_System":datum.code_system,
+                    "Name":build_name(datum.name)}
+            
         output = []
         data = self.ccda.data.immunizations
-        #print(dir(data))
         for entry in data:
-            output.append(entry)
+            immunization = {"Date":build_date_range(entry.date),
+                            "Dose_Quantity":build_qty(entry.dose_quantity),
+                            "Education_Type":build_education(entry.education_type),
+                            "Instructions":entry.instructions,
+                            "product":build_product(entry.product),
+                            "route":build_route(entry.route)}
+                            
+            output.append(immunization)
         return output
 
     def return_instructions(self):
         """
         untested
         """
+        def build_instruction(datum):
+            return {"Code":datum.code,
+                    "Code_System":datum.code_system,
+                    "Name":build_name(datum.name),
+                    "Text":datum.text}
+            
         output = []
         data = self.ccda.data.instructions
         for entry in data:
-            output.append(entry)
+            output.append(build_instruction(entry))
         return output
 
     def return_medications(self):
@@ -293,6 +366,7 @@ class ccda_document():
                     "Period_Value":datum.period_value,
                     "Type":datum.type}
         def return_medication_element(datum):
+            #print("QTY:",datum.dose_quantity.unit, datum.dose_quantity.value)
             return {
                     "Administration":datum.administration.name,
                     "Status":datum.status,
@@ -302,6 +376,9 @@ class ccda_document():
                     "Prescriber":return_prescriber(datum.prescriber),
                     "Product":return_product(datum.product),
                     "Rate_Quantity":build_qty(datum.rate_quantity),
+                    "Refills":datum.refills,
+                    "Fill_Quantity":datum.fill_quantity,
+                    "Fill_Unit":datum.fill_unit,
                     "Reason":datum.reason.name,
                     "Route":datum.route.name,
                     "Schedule":return_schedule(datum.schedule),
@@ -318,7 +395,17 @@ class ccda_document():
         output = []
         data = self.ccda.data.problems
         for entry in data:
-            output.append(entry)
+            output.append({"Age":entry.age,
+                           "Code":entry.code,
+                           "Code_System":entry.code_system,
+                           "Code_System_Name":entry.code_system_name,
+                           "Comment":entry.comment,
+                           "Date":build_date_range(entry.date_range),
+                           "Name":entry.name,
+                           "Status":entry.status,
+                           "Translation":entry.translation.name,
+                           "Translation Code":entry.translation.code,
+                           "Translation Code Name":entry.translation.code_system_name})
         return output
 
     def return_procedures(self):
@@ -387,45 +474,72 @@ class ccda_document():
 
     def return_smoking(self):
         data = self.ccda.data.smoking_status
+        print(data)
         return data.name
 
     def return_vitals(self):
-        output = []
+        output = {}
         data = self.ccda.data.vitals
         for entry in data:
-            date = build_date_range(entry.date)
             for result in entry.results:
-                output.append({"Date":date,
-                               "Results":{"Name:":result.name,
+                if result.name == None and result.unit == None and result.value in [0, None, ""]:
+                    continue
+                if result.date not in output:
+                    output[result.date] = {}
+                if len(result.date) == 14:
+                    date = datetime.strptime(result.date, "%Y%m%d%H%M%S")
+                else:
+                    date = datetime.strptime(result.date, "%Y%m%d")
+                output[result.date][result.name] = {"Name:":result.name,
                                           "Unit":result.unit,
                                           "Value":result.value,
-                                          "Date":result.date
+                                          "Date":date
                                           }
-                                         })
         return output
+
+    def return_social_history(self):
+        shistory = self.ccda.data.social_history
+        return shistory
+        
+def convert_demographics(ddata):
+    #
+    #   Need to flatten the data
+    #
+    pass
+    
 
 document = ccda_document()
 test_path = None
 filenames = None
+for fname in filenames:
+
+if len(sys.argv) > 1:
+    test_path = ""
+    filenames = sys.argv[1:]
+    
 for fname in filenames:
     test_file = os.path.join(test_path, fname)
     document.read_ccda(test_file)
     demographics = document.return_demographics()
     print()
     print(demographics["Name"])
-#    pprint(document.return_demographics())
-    # pprint(document.return_documents())
-    #pprint(document.return_encounters()[0:5])
-    #pprint(document.return_functional_statuses())
-    #print(document.return_immunizations()) # untested
+    #pprint(document.return_demographics())
+#    pprint(document.return_social_history())
+#    pprint(document.return_documents())        # CCD Title
+#   pprint(document.return_encounters()[0:5])
+#    pprint(document.return_functional_statuses())
+    #pprint(document.return_immunizations()) # untested
     #print(document.return_instructions()) # untested
-    #pprint(document.return_medications()[0:5])
-    #pprint(document.return_problems())
-    #pprint(document.return_procedures())
+#    pprint(document.return_medications()[0:5])
+#    pprint(document.return_problems())
+    pprint(document.return_procedures()[0:3])
     #pprint(document.return_allergies())
-#    print (document.return_careplan()) ????
-    output = document.return_results()[0:5]
-    #output = document.return_smoking()
-    #output = document.return_vitals()
-    pprint(output)
+    #print (document.return_careplan()) # Patricia Bunk only
+ #   pprint(document.return_results()[0:5])  #???
+    #pprint(document.return_smoking())
+    #pprint(document.return_vitals())
+#    pprint(document.return_social_history())
+#pprint(output)
     print("-"*30)
+
+    

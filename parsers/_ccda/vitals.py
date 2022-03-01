@@ -17,6 +17,7 @@ from ... import documents
 def vitals(ccda):
 
     parse_date = documents.parse_date
+    parse_name = documents.parse_name
     data = wrappers.ListWrapper()
 
     vitals = ccda.section('vitals')
@@ -25,7 +26,8 @@ def vitals(ccda):
 
         el = entry.tag('effectiveTime')
         entry_date = parse_date(el.attr('value'))
-
+        start_date = parse_date(el.tag('low').attr('value'))
+        end_date = parse_date(el.tag('high').attr('value'))
         results = entry.els_by_tag('component')
         results_data = wrappers.ListWrapper()
 
@@ -40,6 +42,8 @@ def vitals(ccda):
             value = wrappers.parse_number(el.attr('value'))
             unit = el.attr('unit')
 
+            status = result.tag("statusCode").attr("code")
+            person = parse_name(result.tag("author").tag("assignedAuthor").tag("assignedPerson"))
             results_data.append(wrappers.ObjectWrapper(
                 name=name,
                 code=code,
@@ -52,7 +56,9 @@ def vitals(ccda):
             ))
 
         data.append(wrappers.ObjectWrapper(
-            date=entry_date,
+            #date=entry_date,
+            start_date = start_date,
+            end_date = end_date,
             results=results_data
         ))
 

@@ -22,8 +22,11 @@ def section(ccda, name):
     Finds the section of a CCDA document
     """
 
+    name = name.lower()
     entries = documents.entries
 
+    if 'payers' == name:
+        return ccda.template("2.16.840.1.113883.10.20.22.2.18")
     if 'document' == name:
         return ccda.template('2.16.840.1.113883.10.20.22.1.1')
     if 'allergies' == name:

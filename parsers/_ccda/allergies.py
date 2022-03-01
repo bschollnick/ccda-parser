@@ -21,8 +21,7 @@ def allergies(ccda):
     allergies = ccda.section('allergies')
 
     for entry in allergies.entries():
-
-        el = entry.tag('effectiveTime')
+        el = entry.tag("act").tag('effectiveTime')
         start_date = parse_date(el.tag('low').attr('value'))
         end_date = parse_date(el.tag('high').attr('value'))
 

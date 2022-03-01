@@ -31,7 +31,68 @@ def entries(element):
     els.each = lambda callback: map(callback, els)
     return els
 
+def parse_phones_and_email(phone_tags):
+    phones = {}
+    email = None
+    
+    for phnum in phone_tags:
+        ptype, phnumber = parse_phone(phnum)
+        if ptype == None:
+            continue
+        elif ptype == "email":
+            email = phnumber
+            continue
+        phones[ptype] = phnumber
+    if phones == {}:
+        phones = None
+    return (phones, email)
+    
+    
+def parse_phone(phone):
+    phone_types = {"hp":"home",
+                   "wp":"work",
+                   "as":"answering",
+                   "ec":"emergency",
+                   "mc":"mobile",
+                   "pg":"pager",
+                   }
 
+    ph_value = phone.attr("value")
+    if ph_value in [None]:
+        return (None, None)
+    if ph_value.upper().startswith("MAILTO:") or ph_value.count("@") >= 1: 
+        # is it an email, if so, done
+        email = ph_value[ph_value.find(":")+1:]
+        return ("email", email)
+
+    #
+    #   The use attribute exists
+    #
+    ptype = phone.attr("use")
+    if ptype not in ["", None]:
+        ph_value = ph_value[ph_value.find(":")+1:]
+        return (phone_types[ptype.lower()], ph_value)
+
+    #
+    #   The use attribute doesn't exist, we have to manually id them
+    #
+
+    test_numb = ph_value.upper().strip()
+    if test_numb.startswith("TEL:+") or test_numb.startswith("HOME:"):
+        ptype = "home"
+        ph_value = ph_value[ph_value.find("+")+1:]
+    elif test_numb.upper().startswith("WORK:+"):
+        ptype = "work"
+        ph_value = ph_value[ph_value.find("+")+1:]
+    elif ph_value.upper().startswith("MOBILE:+"):
+        ptype = "mobile"
+        ph_value = ph_value[ph_value.find("+")+1:]
+    elif ph_value.upper().startswith("MAILTO:"):
+        ptype = "email"
+        ph_value = ph_value[ph_value.find(":")+1:]
+        return (ptype, ph_value)
+        
+        
 def parse_address(address_element):
     """
     Parses an HL7 address (streetAddressLine [], city, state, postalCode,
@@ -101,6 +162,7 @@ def parse_date(string):
 
 def parse_name(name_element):
     prefix = name_element.tag('prefix').val()
+    suffix = name_element.tag('suffix').val()
     els = name_element.els_by_tag('given')
     given = [e.val() for e in els if e.val()]
     family = name_element.tag('family').val()
@@ -108,5 +170,6 @@ def parse_name(name_element):
     return wrappers.ObjectWrapper(
         prefix=prefix,
         given=given,
-        family=family
+        family=family,
+        suffix=suffix
     )

@@ -16,6 +16,7 @@ def document(ccda):
     parse_date = documents.parse_date
     parse_name = documents.parse_name
     parse_address = documents.parse_address
+    parse_phones = documents.parse_phones_and_email
 
     doc = ccda.section('document')
 
@@ -30,20 +31,24 @@ def document(ccda):
     address_dict = parse_address(el)
 
     el = author.tag('telecom')
-    work_phone = el.attr('value')
+#    work_phone = el.attr('value')
+    phones, email = parse_phones(el.els_by_tag("telecom"))
 
     documentation_of_list = wrappers.ListWrapper()
     performers = doc.tag('documentationOf').els_by_tag('performer')
 
     for el in performers:
         performer_name_dict = parse_name(el)
-        performer_phone = el.tag('telecom').attr('value')
+        #performer_phone = el.tag('telecom').attr('value')
+        performer_phone, performer_email = parse_phones(el.els_by_tag('telecom'))
         performer_addr = parse_address(el.tag('addr'))
         documentation_of_list.append(wrappers.ObjectWrapper(
             name=performer_name_dict,
-            phone=wrappers.ObjectWrapper(
-                work=performer_phone
-            ),
+            phone = performer_phone,
+            email = performer_email,
+            #phone=wrappers.ObjectWrapper(
+            #    work=performer_phone
+            #),
             address=performer_addr
         ))
 
@@ -62,9 +67,11 @@ def document(ccda):
         author=wrappers.ObjectWrapper(
             name=name_dict,
             address=address_dict,
-            phone=wrappers.ObjectWrapper(
-                work=work_phone
-            )
+            phone = phones,
+            email = email,
+            #phone=wrappers.ObjectWrapper(
+            #    work=work_phone
+            #)
         ),
         documentation_of=documentation_of_list,
         location=wrappers.ObjectWrapper(

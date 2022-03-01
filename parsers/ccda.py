@@ -22,7 +22,8 @@ from ._ccda.results import results
 from ._ccda.smoking_status import smoking_status
 from ._ccda.vitals import vitals
 from ..core import wrappers
-
+from ._ccda.social_history import social_history
+from ._ccda.payers import payers
 
 def run(ccda):
     data = wrappers.ObjectWrapper()
@@ -43,5 +44,6 @@ def run(ccda):
     data.procedures = procedures(ccda)
     data.smoking_status = smoking_status(ccda)
     data.vitals = vitals(ccda)
-
+    data.social_history = social_history(ccda)
+    data.payers = payers(ccda)
     return data

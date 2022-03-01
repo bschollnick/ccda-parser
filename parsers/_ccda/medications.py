@@ -22,13 +22,13 @@ def medications(ccda):
     parse_name = documents.parse_name
     data = wrappers.ListWrapper()
     medications = ccda.section('medications')
-
     for entry in medications.entries():
 
         el = entry.tag('text')
         sig = core.strip_whitespace(el.val())
 
-        effective_times = entry.els_by_tag('effectiveTime')
+
+        effective_times = entry.tag("substanceAdministration").els_by_tag('effectiveTime')
         status = entry.tag("statusCode").attr("code")
         # the first effectiveTime is the med start date
         try:
@@ -67,6 +67,15 @@ def medications(ccda):
         product_code = el.attr('code')
         product_code_system = el.attr('codeSystem')
 
+        refills = ""
+        quantity = ""
+        unit = ""
+        for erel in entry.els_by_tag("entryRelationship"):
+            #print(erel.attr("typeCode"))
+            if erel.attr("typeCode") == "REFR":
+                refills = erel.tag("supply").tag("repeatNumber").attr("value")
+                quantity = erel.tag("supply").tag("quantity").attr("value")
+                unit = erel.tag("supply").tag("quantity").attr("unit")
         product_original_text = None
         el = entry.tag('manufacturedProduct').tag('originalText')
         if not el.is_empty():
@@ -91,10 +100,18 @@ def medications(ccda):
             translation_code_system = manu_data["National Drug Codes"]["codeSystem"]
             translation_code_system_name = manu_data["National Drug Codes"]["codeSystemName"]
         else:
-            translation_name = manu_Data[manu_data.keys()[0]]["Name"]
-            translation_code = manu_data[manu_data.keys()[0]]["code"]
-            translation_code_system = manu_data[manu_data.keys()[0]]["codeSystem"]
-            translation_code_system_name = manu_data[manu_data.keys()[0]]["codeSystemName"]
+            if manu_data in [None, {}]:
+                # It's empty
+                translation_name = ""
+                translation_code = ""
+                translation_code_system = ""
+                translation_code_system_name = ""
+            else:
+                manu_keys = list(manu_data.keys())
+                translation_name = manu_data[manu_keys[0]]["Name"]
+                translation_code = manu_data[manu_keys[0]]["code"]
+                translation_code_system = manu_data[manu_keys[0]]["codeSystem"]
+                translation_code_system_name = manu_data[manu_keys[0]]["codeSystemName"]
 
             #el = entry.tag('manufacturedProduct').tag('translation')
             #translation_name = el.attr('displayName')
@@ -181,6 +198,10 @@ def medications(ccda):
                 value=rate_quantity_value,
                 unit=rate_quantity_unit
             ),
+            refills=refills,
+            fill_quantity = quantity,
+            fill_unit = unit,
+            
             precondition=wrappers.ObjectWrapper(
                 name=precondition_name,
                 code=precondition_code,
